@@ -1,9 +1,6 @@
 const fs = require('fs');
 const readline = require('readline');
 const mineflayer = require('mineflayer');
-const { SocksClient } = require('socks');
-const axios = require('axios');
-const { SocksProxyAgent } = require('socks-proxy-agent');
 
 const ACC_FILE = 'registered_accs.json';
 const SERVER_HOST = '185.207.166.54';
@@ -32,45 +29,12 @@ function moveAccToBottom(accName) {
   fs.writeFileSync(ACC_FILE, JSON.stringify(list, null, 4), 'utf8');
 }
 
-function parseProxy(proxyStr) {
-  const u = new URL(proxyStr);
-  return {
-    ip: u.hostname,
-    port: parseInt(u.port),
-    type: u.protocol.includes('socks4') ? 4 : 5
-  };
-}
-
-async function checkProxyIp(proxyUrl) {
-  try {
-    const agent = new SocksProxyAgent(proxyUrl);
-    const res = await axios.get('https://api.ipify.org?format=json', {
-      httpAgent: agent,
-      httpsAgent: agent,
-      timeout: 5000
-    });
-    return res.data.ip;
-  } catch (err) {
-    return null;
-  }
-}
-
 async function runTpaBot(account, targetName) {
-  return new Promise(async (resolve) => {
+  return new Promise((resolve) => {
     console.log(`\n-----------------------------------------`);
-    console.log(`[1] Kiem tra Proxy cho acc: ${account.name}...`);
-
-    const realIp = await checkProxyIp(account.proxy);
-    if (!realIp) {
-      console.log(`[X] Proxy DIE/Timeout! Bo qua acc nay.`);
-      return resolve(false);
-    }
-    console.log(`[✓] Proxy LIVE | IP: ${realIp}`);
-
-    console.log(`[2] Dang ket noi vao server...`);
+    console.log(`[1] Dang ket noi truc tiep vao server...`);
     console.log(`    Acc Name : ${account.name}`);
 
-    const pInfo = parseProxy(account.proxy);
     let isDone = false;
     let isLoggedIn = false;
     let sequenceStarted = false;
@@ -98,40 +62,10 @@ async function runTpaBot(account, targetName) {
       resolve(successStatus);
     }
 
-    const customConnect = (client) => {
-      client.on('error', (err) => {
-        if (!isDone) {
-          console.log(`[X] Socket Error: ${err.message}`);
-          cleanUp(false);
-        }
-      });
-
-      SocksClient.createConnection({
-        proxy: {
-          host: pInfo.ip,
-          port: pInfo.port,
-          type: pInfo.type
-        },
-        command: 'connect',
-        destination: {
-          host: SERVER_HOST,
-          port: SERVER_PORT
-        },
-        timeout: 10000
-      }).then(info => {
-        client.setSocket(info.socket);
-        client.emit('connect');
-      }).catch(err => {
-        console.log(`[X] Loi SOCKS Socket: ${err.message}`);
-        cleanUp(false);
-      });
-    };
-
     bot = mineflayer.createBot({
       host: SERVER_HOST,
       port: SERVER_PORT,
       username: account.name,
-      connect: customConnect,
       version: false
     });
 
